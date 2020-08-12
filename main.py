@@ -62,6 +62,27 @@ def closure(nfa1):
   return  NFA(start , end)
 
 
+def OneorMore(nfa1):
+  start  = State(False)
+  end    = State(True)
+  addEpsilonTransition(start , nfa1.start)
+  addEpsilonTransition(nfa1.end , end)
+  addEpsilonTransition(nfa1.end , nfa1.start)
+  nfa1.end.isEnd = False 
+  return  NFA(start , end)
+
+
+def zeroOrOne(nfa1):
+   start  = State(False)
+   end    = State(True)
+   
+   addEpsilonTransition(start , end);
+   addEpsilonTransition(start , nfa1.start)
+   addEpsilonTransition(nfa1.end , end)
+   nfa1.end.isEnd = False 
+   return NFA(start , end)
+
+
 def ToNFA(postfixExp):
   if postfixExp == ' ':
   	return FromEpsilon()
@@ -69,13 +90,18 @@ def ToNFA(postfixExp):
   stack = [] 
 
   for token in postfixExp: 
-         if token == '*': 
-             stack.append(closure(stack.pop()))	
+         if   token == '*': 
+              stack.append(closure(stack.pop()))	
+         elif token == '+':
+              stack.append(OneorMore(stack.pop()))
+         elif token == '?':
+              stack.append(zeroOrOne(stack.pop()))
          elif token == '|':
               right = stack.pop()
               left  = stack.pop()
               stack.append(union(left , right))
          elif token ==  '.':
+
               right = stack.pop() 
               left  = stack.pop()
               stack.append(concat(left , right))
@@ -94,13 +120,14 @@ def addNextState(state , nextStates , visited):
   	        	visited.append(state)
   	        	addNextState(state ,  nextStates , visited)
   	else:
-                nextStates.append(state)
+              nextStates.append(state)
 
 
 
 def search(nfa , word):
      currentStates = []
      addNextState(nfa.start , currentStates , [])
+     
      for token in word: 
 	  	  nextStates = []
 	  	  for state  in currentStates:
@@ -110,18 +137,151 @@ def search(nfa , word):
 	  	  	       addNextState(nextState , nextStates , [])
 	  	  currentStates = nextStates
 
+     
      for x in currentStates:
        if x.IsEnd == True:
       	  return True
-     
-     
-
      return False 	 
 
 
 
+
+
+def InsertConcatOperator(regex):
+   
+   new_regex = ''
+   index = 0 
+  
+   for i in range(len(regex)):
+
+        new_regex += regex[i]
+
+        if regex[i] == '|' or regex[i] == '(':
+            continue
+                
+        if i  < (len(regex) - 1):
+           if (regex[i+1] == '|' or regex[i+1] == '*' or regex[i+1] == '+' or regex[i+1] == '?' or regex[i+1] == ')'):
+                  continue 
+           new_regex += '.'
+         
+  
+   return new_regex 
+
+
+def ToPostfix(regex):
+    prec = {}
+    prec['*'] = 2 
+    prec['+'] = 2
+    prec['?'] = 2
+    prec['.'] = 1
+    prec['|'] = 0
+    
+   
+   
+    postfixregex  = []
+    stack =  []
+    for token  in regex: 
+          
+          if token == '.' or token == '|' or token == '*' or token == '+' or token == '?':                                                                                                                                            
+            while not len(stack) <= 0 and stack[len(stack) -1] != '(' and  prec.get(stack[len(stack)-1]) >= prec[token]:
+                    postfixregex.append(stack.pop())
+            stack.append(token)
+
+
+          if  token.isalnum():
+             postfixregex.append(token)
+             continue
+
+
+
+          if token == '(':
+              stack.append(token)
+          if token == ')': 
+            
+              token = stack.pop()
               
+              while token  != '(':
+                  postfixregex.append(token)            
+                  token = stack.pop()
+
+        
+
+    while   len(stack) > 0:
+         postfixregex.append(stack.pop())
+    
+    return ''.join(postfixregex) 
 
 
-nfa = ToNFA('ab*|')
-print(search(nfa , 'bbbbb'))
+
+def make_rangeInt(a , b): 
+    str_range  = '('
+    for value in range(int(a) , int(b) +1):  
+
+        str_range += str(value)
+        
+        if value == int(b): 
+           break
+
+        str_range += '|'
+
+
+    str_range += ')'
+
+    return str_range 
+
+
+
+def make_rangeChar(a , b): 
+    str_range  = '('
+    for value in range(ord(a) , ord(b) + 1):  
+      
+        str_range += chr(value)
+        
+        if value == ord(b): 
+           break
+
+        str_range += '|'
+
+
+    str_range += ')'
+
+    return str_range 
+
+
+
+
+ 
+def OpenRange(regex):
+   newregex = ''
+   index = 0
+
+   while index < len(regex): 
+      if regex[index] == '[':
+       
+       if  regex[index+1].isdigit():
+         newregex += make_rangeInt(regex[index+1]  , regex[index+3])
+       else:
+        newregex += make_rangeChar(regex[index+1] , regex[index+3])
+       index += 5
+      else:
+        newregex += regex[index]
+        index += 1
+   return newregex
+
+  
+
+  
+
+
+ 
+while 1:
+
+ print("Enter regex: ")
+ regex = input();
+
+ nfa   = ToNFA(ToPostfix(InsertConcatOperator(OpenRange(regex))))
+
+ print("Enter test string: ")
+ teststr = input()
+ print(search(nfa , teststr))
+ print('\n')
